@@ -11,6 +11,7 @@ from typing import List
 def _examples() -> List[str]:
     return [
         "splash",
+        "fire_flame",
         "custom_pattern",
         "architecture_pattern",
         "composite_material",

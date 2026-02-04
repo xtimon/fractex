@@ -10,6 +10,7 @@ from typing import List, Optional
 def list_examples() -> List[str]:
     return [
         "splash",
+        "fire_flame",
         "custom_pattern",
         "architecture_pattern",
         "composite_material",

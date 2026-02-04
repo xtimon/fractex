@@ -104,6 +104,7 @@ def run_interactive(
     try:
         import matplotlib.pyplot as plt
         from matplotlib.animation import FuncAnimation
+        import matplotlib as mpl
     except Exception:
         print("matplotlib is not available; cannot display interactive output.")
         return
@@ -114,12 +115,21 @@ def run_interactive(
     width = max(config.min_render, width)
     height = max(config.min_render, height)
 
+    mpl.rcParams["toolbar"] = "None"
     fig, ax = plt.subplots()
     dpi = fig.get_dpi()
     fig.set_size_inches(width / dpi, height / dpi)
     ax.axis("off")
-    ax.set_title(config.title)
+    ax.set_title("fractex")
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    try:
+        fig.canvas.manager.toolbar.setVisible(False)
+    except Exception:
+        pass
+    try:
+        fig.canvas.manager.set_window_title("fractex")
+    except Exception:
+        pass
 
     target_ms = 1000.0 / max(1.0, config.target_fps)
     render_scale = 1.0

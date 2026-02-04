@@ -58,7 +58,11 @@ def main():
     dpi = fig.get_dpi()
     fig.set_size_inches(screen_width / dpi, screen_height / dpi)
     ax.axis("off")
-    ax.set_title(f"Fractex Splash ({selected or 'auto'})")
+    ax.set_title("fractex")
+    try:
+        fig.canvas.manager.set_window_title("fractex")
+    except Exception:
+        pass
     
     texture = textures[presets[0]]
     width = max(64, int(screen_width * max(0.1, args.scale)))

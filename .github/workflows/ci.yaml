@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m pip install -e .
+
+      - name: Smoke test
+        run: |
+          python - <<'PY'
+          import numpy as np
+          from fractex import FractalParams, FractalGenerator, InfiniteTexture
+
+          params = FractalParams(seed=1, detail_level=1.0)
+          generator = FractalGenerator(params)
+          texture = InfiniteTexture(generator, "clouds")
+          tile = texture.generate_tile(0, 0, 16, 16, zoom=1.0)
+          print(tile.shape, float(tile.min()), float(tile.max()))
+          PY
+
+      - name: Build sdist and wheel
+        run: python -m build

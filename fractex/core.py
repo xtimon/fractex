@@ -279,6 +279,56 @@ class InfiniteTexture:
         
         return texture
 
+    def _wood_preset(self, noise, x, y, zoom):
+        """Деревянная текстура"""
+        height, width = noise.shape
+        texture = np.zeros((height, width, 4), dtype=np.float32)
+        
+        rings = np.sin((x + y) * 0.1 + noise * 4.0) * 0.5 + 0.5
+        light_wood = np.array([0.7, 0.5, 0.3])
+        dark_wood = np.array([0.4, 0.25, 0.1])
+        for i in range(3):
+            texture[..., i] = light_wood[i] * rings + dark_wood[i] * (1 - rings)
+        
+        texture[..., 3] = 1.0
+        return texture
+
+    def _stone_preset(self, noise, x, y, zoom):
+        """Каменная текстура"""
+        height, width = noise.shape
+        texture = np.zeros((height, width, 4), dtype=np.float32)
+        
+        base = (noise + 1) * 0.5
+        texture[..., 0] = base * 0.6 + 0.2
+        texture[..., 1] = base * 0.6 + 0.2
+        texture[..., 2] = base * 0.6 + 0.2
+        texture[..., 3] = 1.0
+        return texture
+
+    def _lava_preset(self, noise, x, y, zoom):
+        """Лавовая текстура"""
+        height, width = noise.shape
+        texture = np.zeros((height, width, 4), dtype=np.float32)
+        
+        lava = (noise + 1) * 0.5
+        texture[..., 0] = np.clip(lava * 1.5, 0, 1)
+        texture[..., 1] = np.clip(lava * 0.6, 0, 1)
+        texture[..., 2] = np.clip(lava * 0.1, 0, 0.2)
+        texture[..., 3] = 0.9 + lava * 0.1
+        return texture
+
+    def _water_preset(self, noise, x, y, zoom):
+        """Водная текстура"""
+        height, width = noise.shape
+        texture = np.zeros((height, width, 4), dtype=np.float32)
+        
+        waves = np.sin(x * 0.2 + noise * 2.0) * 0.5 + 0.5
+        texture[..., 0] = 0.1 + waves * 0.1
+        texture[..., 1] = 0.2 + waves * 0.2
+        texture[..., 2] = 0.5 + waves * 0.3
+        texture[..., 3] = 0.8
+        return texture
+
 # ------------------------------------------------------------
 # Утилиты для работы с текстурами
 # ------------------------------------------------------------

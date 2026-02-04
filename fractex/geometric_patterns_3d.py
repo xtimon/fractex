@@ -13,7 +13,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 import itertools
 from functools import lru_cache
-from scipy import spatial, ndimage
+try:
+    from scipy import spatial, ndimage
+except ImportError:  # optional dependency
+    spatial = None
+    ndimage = None
 
 # ----------------------------------------------------------------------
 # Структуры данных и перечисления

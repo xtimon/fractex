@@ -628,7 +628,8 @@ class VolumeTextureGenerator3D:
             frequency *= 2.0
         
         # Нормализация к [0, 1]
-        noise_data = (noise_data - noise_data.min()) / (noise.data.max() - noise_data.min())
+        noise_data = (noise_data - noise_data.min()) / (noise_data.max() - noise_data.min())
+        noise_data = np.transpose(noise_data, (2, 1, 0))
         
         # Создаем grayscale текстуру
         texture_data = np.zeros((depth, height, width, 1), dtype=np.float32)
@@ -678,10 +679,14 @@ class VolumeTextureGenerator3D:
                 # Анимированная лава с 4D шумом
                 base_noise = np.zeros_like(xx, dtype=np.float32)
                 for i in range(depth):
-                    w = zz[i, :, :] * 0.1 + time * 0.2
-                    noise_slice = self.noise.noise_4d(xx[i, :, *], yy[i, :, *], 
-                                                     zz[i, :, *], w)
-                    base_noise[i, :, *] = noise_slice
+                    w = zz[:, :, i] * 0.1 + time * 0.2
+                    noise_slice = self.noise.noise_4d(
+                        xx[:, :, i],
+                        yy[:, :, i],
+                        zz[:, :, i],
+                        w,
+                    )
+                    base_noise[:, :, i] = noise_slice
             else:
                 base_noise = self.noise.noise_3d(xx, yy, zz)
         
@@ -721,6 +726,84 @@ class VolumeTextureGenerator3D:
         if self.noise is not None:
             bubble_noise = self.noise.noise_3d(xx * 10, yy * 10, zz * 10) * 0.1
             texture_data[..., 3] += bubble_noise
+        
+        return VolumeTexture3D(
+            data=np.clip(texture_data, 0, 1),
+            format=VolumeFormat.RGBA_FLOAT,
+            voxel_size=(1.0/width, 1.0/height, 1.0/depth)
+        )
+
+    def generate_rocks_3d(self,
+                          width: int = 64,
+                          height: int = 64,
+                          depth: int = 64,
+                          scale: float = 0.08,
+                          hardness: float = 0.6) -> VolumeTexture3D:
+        """Генерация 3D текстуры камня"""
+        print(f"Generating 3D rock texture {width}x{height}x{depth}...")
+        
+        x = np.linspace(0, width * scale, width)
+        y = np.linspace(0, height * scale, height)
+        z = np.linspace(0, depth * scale, depth)
+        xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
+        
+        if self.noise is None:
+            noise_data = np.sin(xx * 0.3) * np.cos(yy * 0.3) * np.sin(zz * 0.3)
+        else:
+            noise_data = np.zeros_like(xx, dtype=np.float32)
+            amplitude = 1.0
+            frequency = 1.0
+            for _ in range(4):
+                noise_data += amplitude * self.noise.noise_3d(
+                    xx * frequency, yy * frequency, zz * frequency
+                )
+                amplitude *= 0.5
+                frequency *= 2.0
+        
+        noise_data = (noise_data - noise_data.min()) / (noise_data.max() - noise_data.min())
+        noise_data = np.transpose(noise_data, (2, 1, 0))
+        
+        density_map = np.clip((noise_data - (1.0 - hardness)) * 3.0, 0.0, 1.0)
+        
+        texture_data = np.zeros((depth, height, width, 4), dtype=np.float32)
+        rock_color = np.array([0.45, 0.45, 0.48])
+        texture_data[..., :3] = rock_color
+        texture_data[..., 3] = density_map
+        
+        return VolumeTexture3D(
+            data=np.clip(texture_data, 0, 1),
+            format=VolumeFormat.RGBA_FLOAT,
+            voxel_size=(1.0/width, 1.0/height, 1.0/depth)
+        )
+
+    def generate_grass_3d(self,
+                          width: int = 64,
+                          height: int = 64,
+                          depth: int = 64,
+                          scale: float = 0.1,
+                          density: float = 0.5) -> VolumeTexture3D:
+        """Генерация 3D текстуры травы"""
+        print(f"Generating 3D grass texture {width}x{height}x{depth}...")
+        
+        x = np.linspace(0, width * scale, width)
+        y = np.linspace(0, height * scale, height)
+        z = np.linspace(0, depth * scale, depth)
+        xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
+        
+        if self.noise is None:
+            noise_data = np.sin(xx * 0.5) * np.cos(yy * 0.5) * np.sin(zz * 0.5)
+        else:
+            noise_data = self.noise.noise_3d(xx, yy, zz)
+        
+        noise_data = (noise_data - noise_data.min()) / (noise_data.max() - noise_data.min())
+        noise_data = np.transpose(noise_data, (2, 1, 0))
+        
+        density_map = np.clip(noise_data * 1.5 - (1.0 - density), 0.0, 1.0)
+        
+        texture_data = np.zeros((depth, height, width, 4), dtype=np.float32)
+        grass_color = np.array([0.15, 0.50, 0.20])
+        texture_data[..., :3] = grass_color
+        texture_data[..., 3] = density_map
         
         return VolumeTexture3D(
             data=np.clip(texture_data, 0, 1),

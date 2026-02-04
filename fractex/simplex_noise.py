@@ -483,9 +483,18 @@ class SimplexNoise:
                  z: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         """3D симплекс-шум"""
         if isinstance(x, np.ndarray) and isinstance(y, np.ndarray) and isinstance(z, np.ndarray):
-            return simplex_noise_3d_array(x, y, z, self.perm_extended)
-        else:
-            return simplex_noise_3d(x, y, z, self.perm_extended)
+            if x.ndim <= 2:
+                return simplex_noise_3d_array(x, y, z, self.perm_extended)
+            result = np.zeros_like(x, dtype=np.float32)
+            it = np.nditer(x, flags=["multi_index"])
+            while not it.finished:
+                idx = it.multi_index
+                result[idx] = simplex_noise_3d(
+                    float(x[idx]), float(y[idx]), float(z[idx]), self.perm_extended
+                )
+                it.iternext()
+            return result
+        return simplex_noise_3d(x, y, z, self.perm_extended)
     
     def noise_4d(self, x: float, y: float, z: float, w: float) -> float:
         """4D симплекс-шум"""
@@ -525,6 +534,29 @@ class SimplexNoise:
             frequency *= lacunarity
         
         # Нормализация (примерная)
+        max_val = (1 - persistence ** octaves) / (1 - persistence)
+        return result / max_val if max_val > 0 else result
+
+    def fractal_noise_3d(self, x: np.ndarray, y: np.ndarray, z: np.ndarray,
+                         octaves: int = 8, persistence: float = 0.5,
+                         lacunarity: float = 2.0,
+                         base_scale: float = 1.0) -> np.ndarray:
+        """
+        Фрактальный 3D шум (fBm) на основе симплекс-шума
+        """
+        result = np.zeros_like(x, dtype=np.float32)
+        amplitude = 1.0
+        frequency = base_scale
+        
+        for _ in range(octaves):
+            nx = x * frequency
+            ny = y * frequency
+            nz = z * frequency
+            noise = self.noise_3d(nx, ny, nz)
+            result += amplitude * noise
+            amplitude *= persistence
+            frequency *= lacunarity
+        
         max_val = (1 - persistence ** octaves) / (1 - persistence)
         return result / max_val if max_val > 0 else result
     
@@ -848,6 +880,91 @@ class SimplexTextureGenerator:
         
         # Альфа-канал с небольшими вариациями
         texture[..., 3] = 0.9 + brightness * 0.1
+        
+        return texture
+
+    def generate_terrain(self, width: int, height: int,
+                         scale: float = 0.005, octaves: int = 6,
+                         persistence: float = 0.5, lacunarity: float = 2.0
+                         ) -> np.ndarray:
+        """
+        Генерация 2D текстуры рельефа
+        
+        Args:
+            width, height: Размеры текстуры
+            scale: Масштаб текстуры
+            octaves: Количество октав
+            persistence: Сохранение амплитуды
+            lacunarity: Умножение частоты
+            
+        Returns:
+            Текстура в формате (height, width, 4) RGBA
+        """
+        x = np.linspace(0, width * scale, width)
+        y = np.linspace(0, height * scale, height)
+        xx, yy = np.meshgrid(x, y)
+        
+        base = self.simplex.fractal_noise_2d(
+            xx, yy, octaves=octaves, persistence=persistence,
+            lacunarity=lacunarity, base_scale=1.0
+        )
+        ridged = self.simplex.ridged_noise_2d(
+            xx, yy, octaves=max(3, octaves // 2), persistence=0.6,
+            lacunarity=2.2, base_scale=1.5
+        )
+        
+        heightmap = base * 0.7 + ridged * 0.3
+        heightmap = (heightmap - heightmap.min()) / (heightmap.max() - heightmap.min())
+        
+        texture = np.zeros((height, width, 4), dtype=np.float32)
+        
+        water = heightmap < 0.35
+        sand = (heightmap >= 0.35) & (heightmap < 0.45)
+        grass = (heightmap >= 0.45) & (heightmap < 0.7)
+        rock = (heightmap >= 0.7) & (heightmap < 0.85)
+        snow = heightmap >= 0.85
+        
+        texture[water, :3] = np.array([0.10, 0.20, 0.50])
+        texture[sand, :3] = np.array([0.76, 0.70, 0.50])
+        texture[grass, :3] = np.array([0.20, 0.55, 0.25])
+        texture[rock, :3] = np.array([0.50, 0.50, 0.50])
+        texture[snow, :3] = np.array([0.92, 0.92, 0.96])
+        
+        variation = self.simplex.noise_2d(xx * 0.2, yy * 0.2) * 0.05
+        texture[..., :3] = np.clip(texture[..., :3] + variation[..., np.newaxis], 0, 1)
+        texture[..., 3] = 1.0
+        
+        return texture
+
+    def generate_grass(self, width: int, height: int,
+                       scale: float = 0.02) -> np.ndarray:
+        """
+        Генерация текстуры травы
+        
+        Args:
+            width, height: Размеры текстуры
+            scale: Масштаб текстуры
+            
+        Returns:
+            Текстура в формате (height, width, 4) RGBA
+        """
+        x = np.linspace(0, width * scale, width)
+        y = np.linspace(0, height * scale, height)
+        xx, yy = np.meshgrid(x, y)
+        
+        base = self.simplex.noise_2d(xx, yy)
+        detail = self.simplex.fractal_noise_2d(
+            xx, yy, octaves=4, persistence=0.6,
+            lacunarity=2.0, base_scale=scale * 5
+        )
+        grass = (base * 0.6 + detail * 0.4)
+        grass = (grass + 1) * 0.5
+        
+        texture = np.zeros((height, width, 4), dtype=np.float32)
+        texture[..., 0] = np.clip(grass * 0.4, 0, 1)
+        texture[..., 1] = np.clip(grass * 0.8 + 0.2, 0, 1)
+        texture[..., 2] = np.clip(grass * 0.4, 0, 1)
+        texture[..., 3] = 1.0
         
         return texture
 

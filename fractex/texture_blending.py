@@ -1039,15 +1039,15 @@ class TerrainTextureBlender:
         for i, (detail_tex, scale, blend_mode) in enumerate(zip(detail_textures, scale_factors, blend_modes)):
             # Создаем маску для деталей на основе шума
             height, width = base_texture.shape[:2]
-            mask = self.mask_gen.generate(
-                width, height,
+            mask_gen = BlendMask(
                 mask_type="noise",
                 parameters={
                     "noise_scale": 0.05 * scale,
                     "octaves": 3,
-                    "threshold": 0.6
-                }
+                    "threshold": 0.6,
+                },
             )
+            mask = mask_gen.generate(width, height)
             
             # Применяем детали
             result = self.blender.blend(

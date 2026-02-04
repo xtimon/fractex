@@ -150,6 +150,12 @@ class NavierStokesSolver3D:
         if obstacles is not None:
             self._apply_obstacles(obstacles)
         
+        # 6. Стабилизация
+        self.velocity = np.nan_to_num(self.velocity, nan=0.0, posinf=0.0, neginf=0.0)
+        max_vel = self.params.max_velocity
+        if max_vel > 0:
+            self.velocity = np.clip(self.velocity, -max_vel, max_vel)
+        
         return self.velocity.copy()
     
     def _add_external_forces(self, forces: Optional[np.ndarray]):
@@ -163,10 +169,10 @@ class NavierStokesSolver3D:
                     for k in range(self.dimensions[2]):
                         self.velocity[i, j, k] += self.params.gravity * self.params.time_step
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _advect_velocity(self):
         """Адвекция скорости (полулагранжевым методом)"""
         dim_z, dim_y, dim_x = self.dimensions
+        self.velocity_prev = self.velocity.copy()
         vel_new = np.zeros_like(self.velocity)
         
         for i in prange(dim_z):
@@ -186,9 +192,9 @@ class NavierStokesSolver3D:
                     prev_k = prev_k % dim_x
                     
                     # Трилинейная интерполяция
-                    i0 = int(np.floor(prev_i))
-                    j0 = int(np.floor(prev_j))
-                    k0 = int(np.floor(prev_k))
+                    i0 = int(np.floor(prev_i)) % dim_z
+                    j0 = int(np.floor(prev_j)) % dim_y
+                    k0 = int(np.floor(prev_k)) % dim_x
                     
                     i1 = (i0 + 1) % dim_z
                     j1 = (j0 + 1) % dim_y
@@ -221,7 +227,6 @@ class NavierStokesSolver3D:
         
         self.velocity = vel_new
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _diffuse_viscosity(self):
         """Диффузия вязкости (явная схема)"""
         if self.params.viscosity <= 0:
@@ -230,7 +235,7 @@ class NavierStokesSolver3D:
         dim_z, dim_y, dim_x = self.dimensions
         dt = self.params.time_step
         viscosity = self.params.viscosity
-        alpha = dt * viscosity * dim_x * dim_y * dim_z
+        alpha = dt * viscosity
         
         vel_new = np.zeros_like(self.velocity)
         
@@ -268,7 +273,6 @@ class NavierStokesSolver3D:
         # Вычитание градиента давления
         self._subtract_pressure_gradient()
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _compute_divergence(self):
         """Вычисление дивергенции поля скоростей"""
         dim_z, dim_y, dim_x = self.dimensions
@@ -286,7 +290,6 @@ class NavierStokesSolver3D:
                     
                     self.divergence[i, j, k] = du_dx + dv_dy + dw_dz
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _solve_pressure_poisson(self, iterations: int = 20):
         """Решение уравнения Пуассона методом Якоби"""
         dim_z, dim_y, dim_x = self.dimensions
@@ -311,7 +314,6 @@ class NavierStokesSolver3D:
             
             self.pressure = pressure_new.copy()
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _subtract_pressure_gradient(self):
         """Вычитание градиента давления из скорости"""
         dim_z, dim_y, dim_x = self.dimensions
@@ -322,8 +324,8 @@ class NavierStokesSolver3D:
                     # Градиенты давления
                     dp_dx = (self.pressure[i, j, (k+1)%dim_x] - 
                             self.pressure[i, j, (k-1)%dim_x]) / 2.0
-                    dp_dy = (self.pressure[i, (j+1)%dim_y] - 
-                            self.pressure[i, (j-1)%dim_y]) / 2.0
+                    dp_dy = (self.pressure[i, (j+1)%dim_y, k] - 
+                            self.pressure[i, (j-1)%dim_y, k]) / 2.0
                     dp_dz = (self.pressure[(i+1)%dim_z, j, k] - 
                             self.pressure[(i-1)%dim_z, j, k]) / 2.0
                     
@@ -332,7 +334,6 @@ class NavierStokesSolver3D:
                     self.velocity[i, j, k, 1] -= dp_dy
                     self.velocity[i, j, k, 2] -= dp_dz
     
-    @jit(nopython=True, cache=True)
     def _apply_obstacles(self, obstacles: np.ndarray):
         """Применение граничных условий на препятствиях"""
         dim_z, dim_y, dim_x = self.dimensions
@@ -942,7 +943,6 @@ class DynamicTextureGenerator3D:
         
         return forces
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _advect_density(self, velocity: np.ndarray):
         """Адвекция плотности полем скоростей (полулагранжевым методом)"""
         dim_z, dim_y, dim_x = self.dimensions
@@ -998,7 +998,6 @@ class DynamicTextureGenerator3D:
         
         self.density_field = density_new
     
-    @jit(nopython=True, parallel=True, cache=True)
     def _diffuse_density(self):
         """Диффузия плотности"""
         if self.params.diffusion_rate <= 0:
@@ -1007,7 +1006,7 @@ class DynamicTextureGenerator3D:
         dim_z, dim_y, dim_x = self.dimensions
         diffusion = self.params.diffusion_rate
         dt = self.params.time_step
-        alpha = dt * diffusion * dim_x * dim_y * dim_z
+        alpha = dt * diffusion
         
         density_new = np.zeros_like(self.density_field)
         

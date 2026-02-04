@@ -3,6 +3,25 @@
 Пример интеграции в игровой движок
 """
 
+import sys
+from pathlib import Path
+from queue import Queue
+import threading
+import argparse
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+EXAMPLES_DIR = Path(__file__).resolve().parent
+if str(EXAMPLES_DIR) not in sys.path:
+    sys.path.insert(0, str(EXAMPLES_DIR))
+
+from fractex import FractalParams, FractalGenerator, InfiniteTexture, TextureStreamer
+from _output import save_ppm
+from fractex.interactive import add_interactive_args, InteractiveConfig, run_interactive
+
+
 class GameTextureSystem:
     """Система текстур для игры с бесконечной детализацией"""
     
@@ -130,10 +149,30 @@ def demo_terrain_texture():
         # Здесь можно визуализировать или сохранить тайлы
         for (tx, ty, lod), tile in list(terrain_tiles.items())[:3]:
             print(f"  Tile ({tx},{ty}) LOD {lod}: {tile.shape}")
+        
+        if terrain_tiles:
+            first_tile = next(iter(terrain_tiles.values()))
+            save_ppm(first_tile, EXAMPLES_DIR / "output" / f"game_texture_tile_{zoom:.1f}x.ppm")
     
     return texture_system
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Game texture example")
+    add_interactive_args(parser)
+    args = parser.parse_args()
+    
     # Запускаем демо
     system = demo_terrain_texture()
     print("\nTexture system ready!")
+    
+    if args.interactive:
+        config = InteractiveConfig.from_args(args, title="Game Texture (interactive)")
+        terrain_params = FractalParams(seed=42, base_scale=0.005, detail_level=3.0)
+        generator = FractalGenerator(terrain_params)
+        texture = InfiniteTexture(generator, "stone")
+        
+        def render_frame(t, w, h):
+            zoom = 1.0 + 0.5 * (1 + np.sin(t * 0.2))
+            return texture.generate_tile(0, 0, w, h, zoom=zoom)[..., :3]
+        
+        run_interactive(render_frame, config)

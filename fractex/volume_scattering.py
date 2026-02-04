@@ -6,6 +6,7 @@
 
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Union, Callable
+from dataclasses import dataclass
 from numba import jit, prange, vectorize, float32, float64, int32, int64
 import warnings
 import math
@@ -28,10 +29,10 @@ class MediumProperties:
     """Свойства среды для рассеяния света"""
     scattering_coefficient: float  # Коэффициент рассеяния (σ_s)
     absorption_coefficient: float  # Коэффициент поглощения (σ_a)
-    extinction_coefficient: float  # Коэффициент экстинкции (σ_t = σ_s + σ_a)
-    scattering_albedo: float       # Альбедо рассеяния (ω = σ_s / σ_t)
-    phase_function_g: float        # Параметр асимметрии для HG (-1 до 1)
-    density: float                 # Плотность среды (0-1)
+    extinction_coefficient: float = 0.0  # σ_t = σ_s + σ_a
+    scattering_albedo: float = 0.0       # ω = σ_s / σ_t
+    phase_function_g: float = 0.0        # Параметр асимметрии для HG (-1 до 1)
+    density: float = 1.0                 # Плотность среды (0-1)
     color: Tuple[float, float, float] = (1.0, 1.0, 1.0)  # Цвет рассеяния
     
     def __post_init__(self):

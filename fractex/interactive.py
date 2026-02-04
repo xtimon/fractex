@@ -16,6 +16,7 @@ def add_interactive_args(parser) -> None:
     parser.add_argument("--fps", type=float, default=30.0, help="Target FPS")
     parser.add_argument("--width", type=int, default=None, help="Override width")
     parser.add_argument("--height", type=int, default=None, help="Override height")
+    parser.add_argument("--speed", type=float, default=1.0, help="Animation speed multiplier")
 
 
 def add_preset_arg(parser, presets, default: Optional[str] = None, dest: str = "preset") -> None:
@@ -79,6 +80,7 @@ class InteractiveConfig:
     scale: float = 1.0
     width: Optional[int] = None
     height: Optional[int] = None
+    speed: float = 1.0
     min_scale: float = 0.4
     max_scale: float = 1.0
     min_render: int = 64
@@ -91,6 +93,7 @@ class InteractiveConfig:
             scale=max(0.1, getattr(args, "scale", 1.0)),
             width=getattr(args, "width", None),
             height=getattr(args, "height", None),
+            speed=max(0.1, getattr(args, "speed", 1.0)),
         )
 
 
@@ -140,7 +143,7 @@ def run_interactive(
 
         render_w = max(config.min_render, int(width * render_scale))
         render_h = max(config.min_render, int(height * render_scale))
-        t = frame / 10.0
+        t = (frame / 10.0) * config.speed
         frame_img = render_frame(t, render_w, render_h)
         frame_img = resize_nearest(frame_img, width, height)
         im.set_array(_ensure_rgb(frame_img))

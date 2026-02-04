@@ -58,7 +58,6 @@ class CustomPatternGenerator:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Custom pattern example")
     add_interactive_args(parser)
-    parser.add_argument("--speed", type=float, default=1.0)
     args = parser.parse_args()
     
     generator = CustomPatternGenerator()
@@ -75,8 +74,7 @@ if __name__ == "__main__":
         config = InteractiveConfig.from_args(args, title="Custom Pattern (interactive)")
         
         def render_frame(t, w, h):
-            speed = max(0.1, args.speed)
-            tt = t * speed * 3.0
+            tt = t * 3.0
             zoom = np.exp(tt * 0.03)
             zoom = min(zoom, 200.0)
             depth = (tt * 1.5) % (params.scale * 6.0)

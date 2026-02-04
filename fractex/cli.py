@@ -36,6 +36,7 @@ def main() -> None:
     parser.add_argument("--fps", type=float, default=None)
     parser.add_argument("--width", type=int, default=None)
     parser.add_argument("--height", type=int, default=None)
+    parser.add_argument("--speed", type=float, default=None)
     parser.add_argument("--preset", type=str, default=None)
     parser.add_argument("args", nargs=argparse.REMAINDER, help="Extra args passed to example")
     args = parser.parse_args()
@@ -62,7 +63,7 @@ def main() -> None:
     if interactive:
         forwarded.append("--interactive")
 
-    for name in ("scale", "fps", "width", "height", "preset"):
+    for name in ("scale", "fps", "width", "height", "preset", "speed"):
         value = getattr(args, name)
         if value is not None:
             forwarded.extend([f"--{name}", str(value)])

@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from fractex import FractalParams, FractalGenerator, InfiniteTexture
-from fractex.interactive import add_preset_arg, resolve_preset
+from fractex.interactive import add_interactive_args, add_preset_arg, resolve_preset
 
 
 def main():
@@ -25,8 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description="Fractex splash animation")
     parser.add_argument("preset", nargs="?", help="Preset name")
     add_preset_arg(parser, ["marble", "clouds", "wood", "lava", "water"], dest="preset_flag")
-    parser.add_argument("--scale", type=float, default=1.0, help="Render scale multiplier")
-    parser.add_argument("--fps", type=float, default=30.0, help="Target FPS")
+    add_interactive_args(parser)
     args = parser.parse_args()
     
     params = FractalParams(seed=7, base_scale=0.01, detail_level=2.0)
@@ -131,8 +130,25 @@ def main():
         render_w = max(64, int(width * render_scale))
         render_h = max(64, int(height * render_scale))
         
-        base = base_texture.generate_tile(x0, y0, render_w, render_h, zoom=base_zoom)[..., :3]
-        detail = detail_texture.generate_tile(x1, y1, render_w, render_h, zoom=detail_zoom)[..., :3]
+        base_origin_x = -render_w / (2.0 * base_zoom)
+        base_origin_y = -render_h / (2.0 * base_zoom)
+        detail_origin_x = -render_w / (2.0 * detail_zoom)
+        detail_origin_y = -render_h / (2.0 * detail_zoom)
+
+        base = base_texture.generate_tile(
+            base_origin_x + x0,
+            base_origin_y + y0,
+            render_w,
+            render_h,
+            zoom=base_zoom,
+        )[..., :3]
+        detail = detail_texture.generate_tile(
+            detail_origin_x + x1,
+            detail_origin_y + y1,
+            render_w,
+            render_h,
+            zoom=detail_zoom,
+        )[..., :3]
         
         depth = 0.35 + 0.15 * np.sin(t * 0.2)
         rgb_frame = np.clip(base * (1.0 - depth) + detail * depth, 0, 1)

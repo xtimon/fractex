@@ -173,6 +173,8 @@ if __name__ == "__main__":
         
         def render_frame(t, w, h):
             zoom = 1.0 + 0.5 * (1 + np.sin(t * 0.2))
-            return texture.generate_tile(0, 0, w, h, zoom=zoom)[..., :3]
+            x0 = -w / (2.0 * zoom)
+            y0 = -h / (2.0 * zoom)
+            return texture.generate_tile(x0, y0, w, h, zoom=zoom)[..., :3]
         
         run_interactive(render_frame, config)

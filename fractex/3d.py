@@ -155,6 +155,9 @@ def sample_volume_trilinear(volume: np.ndarray,
         Интерполированное значение (C,)
     """
     depth, height, width, channels = volume.shape
+    x = np.float32(x)
+    y = np.float32(y)
+    z = np.float32(z)
     
     # Обрабатываем режим заворачивания
     if wrap_mode == "repeat":
@@ -162,17 +165,35 @@ def sample_volume_trilinear(volume: np.ndarray,
         y = y - np.floor(y)
         z = z - np.floor(z)
     elif wrap_mode == "clamp":
-        x = np.clip(x, 0.0, 1.0)
-        y = np.clip(y, 0.0, 1.0)
-        z = np.clip(z, 0.0, 1.0)
+        if x < 0.0:
+            x = 0.0
+        elif x > 1.0:
+            x = 1.0
+        if y < 0.0:
+            y = 0.0
+        elif y > 1.0:
+            y = 1.0
+        if z < 0.0:
+            z = 0.0
+        elif z > 1.0:
+            z = 1.0
     elif wrap_mode == "mirror":
         x = np.abs(1.0 - np.abs(1.0 - x * 2.0)) / 2.0
         y = np.abs(1.0 - np.abs(1.0 - y * 2.0)) / 2.0
         z = np.abs(1.0 - np.abs(1.0 - z * 2.0)) / 2.0
     else:
-        x = np.clip(x, 0.0, 1.0)
-        y = np.clip(y, 0.0, 1.0)
-        z = np.clip(z, 0.0, 1.0)
+        if x < 0.0:
+            x = 0.0
+        elif x > 1.0:
+            x = 1.0
+        if y < 0.0:
+            y = 0.0
+        elif y > 1.0:
+            y = 1.0
+        if z < 0.0:
+            z = 0.0
+        elif z > 1.0:
+            z = 1.0
     
     # Переводим в координаты текстуры
     fx = x * (width - 1)
@@ -221,7 +242,7 @@ def sample_volume_trilinear(volume: np.ndarray,
     # Линейная интерполяция по Z
     result = c0 * (1 - dz) + c1 * dz
     
-    return result
+    return result.astype(volume.dtype)
 
 @jit(nopython=True, parallel=True, cache=True)
 def sample_volume_trilinear_batch(volume: np.ndarray,

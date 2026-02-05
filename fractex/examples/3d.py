@@ -34,7 +34,7 @@ def main():
     args = parser.parse_args()
     game_time = 0.0
     player = Player(
-        position=np.array([0.5, 0.5, 2.0]),
+        position=np.array([0.5, 0.5, 0.9]),
         look_at=np.array([0.5, 0.5, 0.5])
     )
     
@@ -73,7 +73,7 @@ def main():
     # Рендеринг
     renderer = VolumeTextureRenderer(cave_with_lava)
     frames = []
-    for z in [2.2, 2.0, 1.8, 1.6, 1.4, 1.2]:
+    for z in [0.95, 0.85, 0.75, 0.65, 0.55, 0.45]:
         camera_pos = np.array([0.5, 0.5, z])
         frame = renderer.render_raycast(
             camera_pos=camera_pos,

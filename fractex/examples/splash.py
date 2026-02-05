@@ -80,6 +80,7 @@ def main():
     ema_ms = target_ms
     phases = {name: 0.0 for name in presets}
     last_t_base = 0.0
+    phase_wrap = 90.0
     
     def _upscale_nearest(image: np.ndarray, out_w: int, out_h: int) -> np.ndarray:
         in_h, in_w, _ = image.shape
@@ -103,20 +104,47 @@ def main():
             base_name = presets[(frame // 240) % len(presets)]
             detail_name = presets[(frame // 240 + 1) % len(presets)]
         
-        phases[base_name] += delta_t
-        base_texture = textures[base_name]
-        detail_texture = textures[detail_name]
-        t = phases[base_name]
-        t2 = phases[detail_name]
-        
-        base_zoom = 1.0 + t * 0.02
-        detail_zoom = 2.5 + t * 0.05
-        
-        decay = np.exp(-0.01 * t)
-        x0 = np.sin(t * 0.12) * 5.0 * decay
-        y0 = np.cos(t * 0.10) * 5.0 * decay
-        x1 = np.sin(t2 * 0.22 + 1.2) * 2.0 * decay
-        y1 = np.cos(t2 * 0.18 + 0.7) * 2.0 * decay
+        phases[base_name] = (phases[base_name] + delta_t) % phase_wrap
+        phases[detail_name] = (phases[detail_name] + delta_t) % phase_wrap
+        def _render_layer(base_preset: str, detail_preset: str) -> np.ndarray:
+            base_texture = textures[base_preset]
+            detail_texture = textures[detail_preset]
+            t = phases[base_preset]
+            t2 = phases[detail_preset]
+            
+            base_zoom = 1.0 + 0.15 * np.sin(t * 0.25)
+            detail_zoom = 2.4 + 0.25 * np.sin(t2 * 0.35)
+            
+            x0 = np.sin(t * 0.12) * 5.0
+            y0 = np.cos(t * 0.10) * 5.0
+            x1 = np.sin(t2 * 0.22 + 1.2) * 2.0
+            y1 = np.cos(t2 * 0.18 + 0.7) * 2.0
+            
+            base_origin_x = -render_w / (2.0 * base_zoom)
+            base_origin_y = -render_h / (2.0 * base_zoom)
+            detail_origin_x = -render_w / (2.0 * detail_zoom)
+            detail_origin_y = -render_h / (2.0 * detail_zoom)
+            
+            base = base_texture.generate_tile(
+                base_origin_x + x0,
+                base_origin_y + y0,
+                render_w,
+                render_h,
+                zoom=base_zoom,
+            )[..., :3]
+            detail = detail_texture.generate_tile(
+                detail_origin_x + x1,
+                detail_origin_y + y1,
+                render_w,
+                render_h,
+                zoom=detail_zoom,
+            )[..., :3]
+            
+            depth = 0.35 + 0.15 * np.sin(t * 0.2)
+            rgb = np.clip(base * (1.0 - depth) + detail * depth, 0, 1)
+            tint = 0.6 + 0.4 * np.sin(t * 0.2)
+            rgb = np.clip(rgb * np.array([1.0, tint, 0.9]), 0, 1)
+            return rgb
         
         now = time.perf_counter()
         dt_ms = (now - last_time) * 1000.0
@@ -134,31 +162,20 @@ def main():
         render_w = max(64, int(width * render_scale))
         render_h = max(64, int(height * render_scale))
         
-        base_origin_x = -render_w / (2.0 * base_zoom)
-        base_origin_y = -render_h / (2.0 * base_zoom)
-        detail_origin_x = -render_w / (2.0 * detail_zoom)
-        detail_origin_y = -render_h / (2.0 * detail_zoom)
-
-        base = base_texture.generate_tile(
-            base_origin_x + x0,
-            base_origin_y + y0,
-            render_w,
-            render_h,
-            zoom=base_zoom,
-        )[..., :3]
-        detail = detail_texture.generate_tile(
-            detail_origin_x + x1,
-            detail_origin_y + y1,
-            render_w,
-            render_h,
-            zoom=detail_zoom,
-        )[..., :3]
-        
-        depth = 0.35 + 0.15 * np.sin(t * 0.2)
-        rgb_frame = np.clip(base * (1.0 - depth) + detail * depth, 0, 1)
-        
-        tint = 0.6 + 0.4 * np.sin(t * 0.2)
-        rgb_frame = np.clip(rgb_frame * np.array([1.0, tint, 0.9]), 0, 1)
+        rgb_frame = _render_layer(base_name, detail_name)
+        if not selected:
+            cycle_len = 240
+            transition_len = 60
+            cycle_pos = frame % cycle_len
+            if cycle_pos >= cycle_len - transition_len:
+                next_base = presets[(frame // cycle_len + 1) % len(presets)]
+                next_detail = presets[(frame // cycle_len + 2) % len(presets)]
+                phases[next_base] = (phases[next_base] + delta_t) % phase_wrap
+                phases[next_detail] = (phases[next_detail] + delta_t) % phase_wrap
+                next_rgb = _render_layer(next_base, next_detail)
+                w = (cycle_pos - (cycle_len - transition_len)) / transition_len
+                w = w * w * (3.0 - 2.0 * w)
+                rgb_frame = np.clip(rgb_frame * (1.0 - w) + next_rgb * w, 0, 1)
         rgb_frame = _upscale_nearest(rgb_frame, width, height)
         im.set_array(rgb_frame)
         return (im,)

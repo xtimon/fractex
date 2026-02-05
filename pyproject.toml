@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fractex"
-version = "0.2.0"
+version = "0.2.1"
 description = "Fractal texture engine for procedural and infinite-detail textures."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 authors = [{ name = "Timur Isanov", email = "tisanov@yahoo.com" }]
-dependencies = ["numpy", "numba"]
+dependencies = ["numpy", "numba", "matplotlib"]
 keywords = ["fractal", "texture", "procedural", "noise"]
 classifiers = [
     "Development Status :: 3 - Alpha",
